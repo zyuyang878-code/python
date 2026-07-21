@@ -2,18 +2,29 @@ class Category:
     def __init__(self,name):
         self.name=name
         self.ledger=[]
+
     def deposit(self,amount,description=""):
-        self.ledger.append({"amount":amount,"description":description})
-    def check_funds(self,amount):
-        if self.get_balance()>=amount:
+        self.ledger.append({"amount":amount, "description":description})
+
+    def get_balance(self):
+        return sum(item["amount"] for item in self.ledger)
+
+    def transfer(self,amount,category_instance):
+        if self.check_funds(amount):
+            self.withdraw(amount, f"Transfer to {category_instance.name}")
+            category_instance.deposit(amount, f"Transfer from {self.name}")
             return True
-        else:
-            return False
+        return False
+
+    def check_funds(self,amount):
+        return self.get_balance() >= amount
+
     def withdraw(self,amount,description=""):
         if self.check_funds(amount):
             self.ledger.append({"amount":-amount,"description":description})
-           return True
+            return True
         return False
+
     def __str__(self):
         title=self.name.center(30,"*")
         lines=[title]
@@ -22,44 +33,34 @@ class Category:
             desc=item['description'][:23]
             amount_val=item['amount']
             line=f"{desc:<23}{amount_val:>7.2f}"
-            line.append(line)
+            lines.append(line)
             total+=amount_val
-       line.append(f"Total:{total:.2f}")
-       return "\n".join(lines)
-    def create_spend_chart(categories):
-        spent_list=[]
-        for cat in categories:
-          spent=0:
+        lines.append(f"Total:{total:.2f}")
+        return "\n".join(lines)
+
+def create_spend_chart(categories):
+    spent_list=[]
+    for cat in categories:
+        spent = 0
         for item in cat.ledger:
-                if item['amount']<0:
-                    spent+=abs(item['amount'])
+            if item['amount'] < 0:
+                spent += abs(item['amount'])
         spent_list.append(spent)
-        total_spent=sum(spent_list)
-        percentages=[]
-        for spent in spent_list:
-            if total_spent>0:
-                pct=int((spent/total_spent*100))
-            else:
-                pct=0
-            percentages.append(pct)
-        chart="Percentage spent by category\n"
-        for i in range(100,-1,-10):
-            chart+=str(i).rjust(3)+"| "
-            for pct in percentages:
-                if pct>=i:
-                    chart+="•  "
-                else:
-                    chart+="   "
-            chart+="\n"
-    dash_line_len=len(percentages)*3+1
-    chart+="    "+"_"*dash_line_len+"\n"
-    max_name_len=max(len(cat.name)for cat in categories)
+    total_spent = sum(spent_list)
+    percentages = [int((spent / total_spent * 100)) if total_spent > 0 else 0 for spent in spent_list]
+    
+    chart = "Percentage spent by category\n"
+    for i in range(100, -1, -10):
+        chart += str(i).rjust(3) + "| "
+        for pct in percentages:
+            chart += "o  " if pct >= i else "   "
+        chart += "\n"
+    dash_line_len = len(percentages) * 3 + 1
+    chart += "    " + "-" * dash_line_len + "\n"
+    max_name_len = max(len(cat.name) for cat in categories)
     for i in range(max_name_len):
-        chart+="    "
+        chart += "     "
         for cat in categories:
-            if i<len(cat.name):
-                chart+=cat.name[i]+" "
-            else:
-                chart+="    "
-        chart= .strip()+"\n"
-    return chart.strip('\n')
+            chart += f"{cat.name[i]}  " if i < len(cat.name) else "   "
+        chart = chart.rstrip() + "\n"
+    return chart
