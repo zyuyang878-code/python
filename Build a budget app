@@ -1,69 +1,168 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+
 class Category:
-    def __init__(self, name):
-        self.name = name
-        self.ledger = []
+def __init__(self, name):
+self.name = name
+self.ledger = []
 
-    def deposit(self, amount, description=""):
-        self.ledger.append({"amount": amount, "description": description})
+def deposit(self, amount, description=""):
+self.ledger.append({"amount": amount, "description": description})
 
-    def get_balance(self):
-        return sum(item["amount"] for item in self.ledger)
+def get_balance(self):
+return sum(item["amount"] for item in self.ledger)
 
-    def transfer(self, amount, category_instance):
-        if self.check_funds(amount):
-            self.withdraw(amount, f"Transfer to {category_instance.name}")
-            category_instance.deposit(amount, f"Transfer from {self.name}")
-            return True
-        return False
+def check_funds(self, amount):
+return self.get_balance() >= amount
 
-    def check_funds(self, amount):
-        return self.get_balance() >= amount
+def withdraw(self, amount, description=""):
+if self.check_funds(amount):
+self.ledger.append({"amount": -amount, "description": description})
+return True
+return False
 
-    def withdraw(self, amount, description=""):
-        if self.check_funds(amount):
-            self.ledger.append({"amount": -amount, "description": description})
-            return True
-        return False
+def transfer(self, amount, category_instance):
+if self.check_funds(amount):
+self.withdraw(amount, f"Transfer to {category_instance.name}")
+category_instance.deposit(amount, f"Transfer from {self.name}")
+return True
+return False
 
-    def __str__(self):
-        title_line = f"{self.name:*^30}"
-        lines = [title_line]
-        
-        for item in self.ledger:
-            desc = item["description"][:23].ljust(23)
-            amount = f"{item['amount']:7.2f}"
-            lines.append(f"{desc}{amount}")
-        
-        total_balance = self.get_balance()
-        lines.append(f"Total: {total_balance:.2f}")
-        return "\n".join(lines)
+st.set_page_config(page_title="动态预算管理仪表盘", layout="wide")
+
+if "categories" not in st.session_state:
+food = Category("Food")
+food.deposit(1000, "初始资金")
+food.withdraw(121.78, "超市买菜")
+
+entertainment = Category("Entertainment")
+entertainment.deposit(2000, "初始资金")
+entertainment.withdraw(200, "看电影")
+
+business = Category("Business")
+business.deposit(3000, "初始资金")
+business.transfer(500, food)
+
+st.session_state.categories = {
+"Food": food,
+"Entertainment": entertainment,
+"Business": business
+}
+
+categories_dict = st.session_state.categories
 
 
-def create_spend_chart(categories):
-    spent_list = []
-    for cat in categories:
-        spent = sum(abs(item["amount"]) for item in cat.ledger if item["amount"] < 0)
-        spent_list.append(spent)
-    total_spent = sum(spent_list)
-    percentages = [int((spent / total_spent * 100)) if total_spent > 0 else 0 for spent in spent_list]
-    cat_count = len(percentages)
+st.title("💳 动态预算管理仪表盘")
+st.markdown("实时管理你的分类账户与消费统计")
 
-    chart_lines = ["Percentage spent by category"]
-    
-    for i in range(100, -1, -10):
-        line = f"{str(i).rjust(3)}| "
-        for pct in percentages:
-            line += "o  " if pct >= i else "   "
-        chart_lines.append(line)
-    
-    separator_line = "    " + "-" * (cat_count * 3+1)
-    chart_lines.append(separator_line)
-    
-    max_name_len = max(len(cat.name) for cat in categories)
-    for i in range(max_name_len):
-        line = "     "
-        for cat in categories:
-            line += f"{cat.name[i]}  " if i < len(cat.name) else "   "
-        chart_lines.append(line)
-    
-    return "\n".join(chart_lines)
+st.sidebar.header("🛠️ 账目操作面板")
+
+with st.sidebar.expander("➕ 新建预算分类"):
+new_cat_name = st.text_input("分类名称")
+if st.button("创建分类"):
+if new_cat_name and new_cat_name not in categories_dict:
+categories_dict[new_cat_name] = Category(new_cat_name)
+st.success(f"已创建分类：{new_cat_name}")
+st.rerun()
+
+
+op_type = st.sidebar.radio("选择操作类型", ["存款 (Deposit)", "取款 (Withdraw)", "转账 (Transfer)"])
+
+cat_names = list(categories_dict.keys())
+selected_cat_name = st.sidebar.selectbox("选择分类", cat_names)
+selected_cat = categories_dict[selected_cat_name]
+
+amount = st.sidebar.number_input("金额", min_value=0.01, step=10.0)
+description = st.sidebar.text_input("备注描述", value="")
+
+if op_type == "存款 (Deposit)":
+if st.sidebar.button("确认存款"):
+selected_cat.deposit(amount, description)
+st.toast(f"成功存入 ${amount:.2f} 到 {selected_cat_name}！")
+st.rerun()
+
+elif op_type == "取款 (Withdraw)":
+if st.sidebar.button("确认取款"):
+if selected_cat.withdraw(amount, description):
+st.toast(f"成功从 {selected_cat_name} 取出 ${amount:.2f}！")
+st.rerun()
+else:
+st.sidebar.error("余额不足！")
+
+elif op_type == "转账 (Transfer)":
+target_cat_name = st.sidebar.selectbox("转入的目标分类", [c for c in cat_names if c != selected_cat_name])
+if st.sidebar.button("确认转账"):
+target_cat = categories_dict[target_cat_name]
+if selected_cat.transfer(amount, target_cat):
+st.toast(f"成功转账 ${amount:.2f} 从 {selected_cat_name} 到 {target_cat_name}！")
+st.rerun()
+else:
+st.sidebar.error("余额不足，无法完成转账！")
+
+
+# 1. 顶部 KPI 卡片
+total_balance = sum(cat.get_balance() for cat in categories_dict.values())
+total_spent = sum(
+sum(abs(item["amount"]) for item in cat.ledger if item["amount"] < 0)
+for cat in categories_dict.values()
+)
+
+col1, col2, col3 = st.columns(3)
+col1.metric("💰 账户总资产", f"${total_balance:,.2f}")
+col2.metric("💸 总消费支出", f"${total_spent:,.2f}")
+col3.metric("📂 预算分类数", f"{len(categories_dict)} 个")
+
+st.divider()
+
+col_chart1, col_chart2 = st.columns(2)
+
+spending_data = []
+for name, cat in categories_dict.items():
+spent = sum(abs(item["amount"]) for item in cat.ledger if item["amount"] < 0)
+balance = cat.get_balance()
+spending_data.append({"Category": name, "Spent": spent, "Balance": balance})
+
+df_summary = pd.DataFrame(spending_data)
+
+with col_chart1:
+st.subheader("📊 各分类消费占比 (饼图)")
+if df_summary["Spent"].sum() > 0:
+fig_pie = px.pie(
+df_summary,
+values="Spent",
+names="Category",
+hole=0.4,
+color_discrete_sequence=px.colors.qualitative.Pastel
+)
+fig_pie.update_traces(textinfo="percent+label", hovertemplate="%{label}: $%{value:.2f}")
+st.plotly_chart(fig_pie, use_container_width=True)
+else:
+st.info("暂无任何消费支出记录")
+
+with col_chart2:
+st.subheader("📈 各分类当前余额 (柱状图)")
+fig_bar = px.bar(
+df_summary,
+x="Category",
+y="Balance",
+color="Category",
+text_auto=".2f",
+labels={"Balance": "余额 ($)", "Category": "分类"}
+)
+fig_bar.update_layout(showlegend=False)
+st.plotly_chart(fig_bar, use_container_width=True)
+
+st.divider()
+
+st.subheader("📜 分类明细与历史账单")
+detail_cat_name = st.selectbox("选择要查看明细的分类", cat_names, key="detail_select")
+detail_cat = categories_dict[detail_cat_name]
+
+if detail_cat.ledger:
+df_ledger = pd.DataFrame(detail_cat.ledger)
+df_ledger["Type"] = df_ledger["amount"].apply(lambda x: "收入/转入" if x > 0 else "支出/转出")
+df_ledger["amount"] = df_ledger["amount"].map("${:,.2f}".format)
+st.dataframe(df_ledger, use_container_width=True)
+else:
+st.caption("该分类下暂无交易明细。")
