@@ -100,8 +100,6 @@ st.rerun()
 else:
 st.sidebar.error("余额不足，无法完成转账！")
 
-
-# 1. 顶部 KPI 卡片
 total_balance = sum(cat.get_balance() for cat in categories_dict.values())
 total_spent = sum(
 sum(abs(item["amount"]) for item in cat.ledger if item["amount"] < 0)
