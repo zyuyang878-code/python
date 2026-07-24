@@ -90,13 +90,13 @@ if op_type == "存款 (Deposit)":
 
 elif op_type == "转账 (Transfer)":
     target_cat_name = st.sidebar.selectbox("转入的目标分类", [c for c in cat_names if c != selected_cat_name])
-if st.sidebar.button("确认转账"):
-    target_cat = categories_dict[target_cat_name]
-if selected_cat.transfer(amount, target_cat):
-    st.toast(f"成功转账 ${amount:.2f} 从 {selected_cat_name} 到 {target_cat_name}！")
-    st.rerun()
-else:
-    st.sidebar.error("余额不足，无法完成转账！")
+    if st.sidebar.button("确认转账"):
+        target_cat = categories_dict[target_cat_name]
+        if selected_cat.transfer(amount, target_cat):
+            st.toast(f"成功转账 ${amount:.2f} 从 {selected_cat_name} 到 {target_cat_name}！")
+            st.rerun()
+        else:
+            st.sidebar.error("余额不足，无法完成转账！")
 
 total_balance = sum(cat.get_balance() for cat in categories_dict.values())
 total_spent = sum(
